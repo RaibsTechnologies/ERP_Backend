@@ -3,8 +3,18 @@ require('dotenv').config(); // Loading environment variables from .env file
 const authRouter = require('./router/authRouter'); // Importing the auth router
 const path = require('path'); // Importing the path module for handling file paths
 const cookieParser = require('cookie-parser'); // Importing cookie-parser for handling cookies
+const cors = require('cors'); // Importing cors for handling Cross-Origin Resource Sharing
 
 const app = express(); // Creating an instance of an Express application
+
+app.use(cors({
+  origin:"http://localhost:5173", // Allowing requests from this origin
+  credentials: true, // Allowing credentials (cookies, authorization headers, etc.) to be sent with requests
+  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Allowing these HTTP methods
+  allowedHeaders: ['Content-Type', 'Authorization'] // Allowing these headers in requests
+})); // Enabling CORS for all routes
+
+app.use(express.urlencoded({ extended: true }));
 
 app.use(express.json()); // Middleware to parse JSON request bodies
 app.use(cookieParser()); // Middleware to parse cookies

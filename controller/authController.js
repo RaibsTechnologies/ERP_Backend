@@ -31,19 +31,20 @@ const registerUser = async (req, res) => {
 
 const login = async (req, res) => {
     try {
-        const { username, password_hash } = req.body; // Destructuring username and password from request body
-        if (!username || !password_hash) {
+        console.log("incoming body", req.body);
+        const { email, password } = req.body; // Destructuring username and password from request body
+        if (!email || !password) {
             return res.status(400).json({ message: "Username and password are required" }); // Sending a 400 Bad Request response if any field is missing
         }
 
         // check the user is already exist
-        const [user] = await db.query('SELECT * FROM login WHERE username = ?', [username]); // Fetching the user from the database by username
+        const [user] = await db.query('SELECT * FROM login WHERE email = ?', [email]); // Fetching the user from the database by username
         if (user.length === 0) {
             return res.status(404).json({ message: "User not found" }); // Sending a 404 Not Found response if user does not exist
         }
 
         // check password
-        const isPasswordValid = await bcrpty.compare(password_hash, user[0].password_hash); // Comparing the provided password with the stored hashed password
+        const isPasswordValid = await bcrpty.compare(password, user[0].password_hash); // Comparing the provided password with the stored hashed password
         if (!isPasswordValid) {
             return res.status(401).json({ message: "Invalid password" }); // Sending a 401 Unauthorized response if password is incorrect
         }
@@ -59,7 +60,11 @@ const login = async (req, res) => {
             httpOnly: true,
             maxAge: parseInt(process.env.COOKIE_EXPIRES_IN) * 24 * 60 * 60 * 1000 // Cookie expiration time
         });
-        res.status(200).json({ message: "Login successful" }); // Sending a 200 OK response with the JWT token
+        res.status(200).json({
+            message: "Login successful",
+            user: { id: user[0].user_id, username: user[0].username, email: user[0].email, profile: user[0].profile }
+        });
+
     } catch (error) {
         console.error("Error logging in:", error.message); // Logging any errors that occur during login
         return res.status(500).json({ message: "Internal server error" }); // Sending a 500 Internal Server Error response   
@@ -70,14 +75,34 @@ const getUserDetails = async (req, res) => {
     try {
         const user_id = req.user.userId; // Getting the user ID from the authenticated request
         const [user] = await db.query('SELECT user_id, username, email, profile FROM login WHERE user_id = ?', [user_id]); // Fetching the user details from the database
-        if (user.length === 0) {            
+        if (user.length === 0) {
             return res.status(404).json({ message: "User not found" }); // Sending a 404 Not Found response if user does not exist
         }
-        res.status(200).json({ user: user[0] }); // Sending a 200 OK response with the user details        
+        res.json(user[0]); // Sending a 200 OK response with the user details        
     } catch (error) {
         console.error("Error fetching user details:", error.message); // Logging any errors that occur while fetching user details
         return res.status(500).json({ message: "Internal server error" }); // Sending a 500 Internal Server Error response   
     }
+
 }
 
-module.exports = { registerUser, login, getUserDetails }; // Exporting the registerUser function for use in other modules
+const uploadProfilePhoto = async (req, res) => {
+    try {
+        const user_id = req.user.userId; // Getting the user ID from the authenticated request
+        if (!req.file) {
+            return res.status(400).json({ message: "No file uploaded" }); // Sending a 400 Bad Request response if no file is uploaded
+        }
+        const profile = `/uploads/${req.file.filename}`; // Getting the uploaded file's filename
+        const [result] = await db.query('UPDATE login SET profile = ? WHERE user_id = ?', [profile, user_id]); // Updating the user's profile photo in the database
+        console.log(result);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: "User not found" }); // Sending a 404 Not Found response if user does not exist
+        }
+        res.status(200).json({ message: "Profile photo updated successfully", profile }); // Sending a 200 OK response with the new profile photo path
+    } catch (error) {
+        console.error("Error uploading profile photo:", error.message); // Logging any errors that occur during profile photo upload
+        return res.status(500).json({ message: "Internal server error" }); // Sending a 500 Internal Server Error response   
+    }
+}
+
+module.exports = { registerUser, login, getUserDetails, uploadProfilePhoto }; // Exporting the registerUser function for use in other modules
