@@ -1,5 +1,6 @@
 const db = require('../db.js'); // Importing the database connection   
 const bcrpty = require('bcryptjs'); // Importing bcrypt for password hashing
+const jwt = require('jsonwebtoken'); // Importing jsonwebtoken for creating JWT tokens
 
 const registerUser = async (req, res) => {
     try {
@@ -34,20 +35,49 @@ const login = async (req, res) => {
         if (!username || !password_hash) {
             return res.status(400).json({ message: "Username and password are required" }); // Sending a 400 Bad Request response if any field is missing
         }
+
+        // check the user is already exist
         const [user] = await db.query('SELECT * FROM login WHERE username = ?', [username]); // Fetching the user from the database by username
-        console[user];
         if (user.length === 0) {
             return res.status(404).json({ message: "User not found" }); // Sending a 404 Not Found response if user does not exist
         }
+
+        // check password
         const isPasswordValid = await bcrpty.compare(password_hash, user[0].password_hash); // Comparing the provided password with the stored hashed password
         if (!isPasswordValid) {
             return res.status(401).json({ message: "Invalid password" }); // Sending a 401 Unauthorized response if password is incorrect
         }
-        res.status(200).json({ message: "Login successful", userId: user[0].id }); // Sending a 200 OK response with the user's ID
+
+        // create and send JWT token in cookie
+
+        const token = jwt.sign(
+            { userId: user[0].user_id }, // or { username: user[0].username }
+            process.env.JWT_SECRET,
+            { expiresIn: process.env.JWT_EXPIRES_IN }
+        );
+        res.cookie('token', token, {
+            httpOnly: true,
+            maxAge: parseInt(process.env.COOKIE_EXPIRES_IN) * 24 * 60 * 60 * 1000 // Cookie expiration time
+        });
+        res.status(200).json({ message: "Login successful" }); // Sending a 200 OK response with the JWT token
     } catch (error) {
-        console.error("Error registering user:", error.message); // Logging any errors that occur during registration
+        console.error("Error logging in:", error.message); // Logging any errors that occur during login
         return res.status(500).json({ message: "Internal server error" }); // Sending a 500 Internal Server Error response   
     }
 }
 
-module.exports = { registerUser, login }; // Exporting the registerUser function for use in other modules
+const getUserDetails = async (req, res) => {
+    try {
+        const user_id = req.user.userId; // Getting the user ID from the authenticated request
+        const [user] = await db.query('SELECT user_id, username, email, profile FROM login WHERE user_id = ?', [user_id]); // Fetching the user details from the database
+        if (user.length === 0) {            
+            return res.status(404).json({ message: "User not found" }); // Sending a 404 Not Found response if user does not exist
+        }
+        res.status(200).json({ user: user[0] }); // Sending a 200 OK response with the user details        
+    } catch (error) {
+        console.error("Error fetching user details:", error.message); // Logging any errors that occur while fetching user details
+        return res.status(500).json({ message: "Internal server error" }); // Sending a 500 Internal Server Error response   
+    }
+}
+
+module.exports = { registerUser, login, getUserDetails }; // Exporting the registerUser function for use in other modules
