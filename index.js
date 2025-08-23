@@ -1,6 +1,7 @@
 const express = require('express'); // Importing the express module
 require('dotenv').config(); // Loading environment variables from .env file
 const authRouter = require('./router/authRouter'); // Importing the auth router
+const productRouter = require('./router/productRouter'); // Importing the product router
 const path = require('path'); // Importing the path module for handling file paths
 const cookieParser = require('cookie-parser'); // Importing cookie-parser for handling cookies
 const cors = require('cors'); // Importing cors for handling Cross-Origin Resource Sharing
@@ -20,6 +21,7 @@ app.use(express.json()); // Middleware to parse JSON request bodies
 app.use(cookieParser()); // Middleware to parse cookies
 app.use("/uploads", express.static(path.join(__dirname, "uploads"))); // Serving static files from the uploads directory 
 app.use('/api/auth', authRouter); // Mounting the auth router on the /api/auth path
+app.use('/api/productList', productRouter); // Mounting the product router on the /api/products path
 
 const PORT = process.env.PORT || 3000; // Setting the port to listen on, defaulting to 3000
 
